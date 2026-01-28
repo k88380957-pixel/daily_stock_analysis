@@ -133,16 +133,22 @@ class MarketAnalyzer:
         
         return overview
 
-    def _call_akshare_with_retry(self, fn, name: str, attempts: int = 2):
+    def _call_akshare_with_retry(self, fn, name: str, attempts: int = 3):
         last_error: Optional[Exception] = None
         for attempt in range(1, attempts + 1):
             try:
+                # 增加随机延迟，模拟人类行为
+                import random
+                time.sleep(random.uniform(1.0, 3.0))
                 return fn()
             except Exception as e:
                 last_error = e
                 logger.warning(f"[大盘] {name} 获取失败 (attempt {attempt}/{attempts}): {e}")
                 if attempt < attempts:
-                    time.sleep(min(2 ** attempt, 5))
+                    # 指数退避重试
+                    sleep_time = min(2 ** attempt + random.uniform(1, 3), 15)
+                    logger.info(f"[大盘] 等待 {sleep_time:.1f} 秒后重试...")
+                    time.sleep(sleep_time)
         logger.error(f"[大盘] {name} 最终失败: {last_error}")
         return None
     
@@ -196,9 +202,16 @@ class MarketAnalyzer:
         try:
             logger.info("[大盘] 获取市场涨跌统计...")
             
-            # 获取全部A股实时行情
-            df = self._call_akshare_with_retry(ak.stock_zh_a_spot_em, "A股实时行情", attempts=2)
+            # 尝试多个接口作为备选
+            df = None
+            # 接口1: 东方财富实时行情 (默认)
+            df = self._call_akshare_with_retry(ak.stock_zh_a_spot_em, "A股实时行情(EM)", attempts=2)
             
+            # 接口2: 新浪财经实时行情 (备选)
+            if df is None or df.empty:
+                logger.info("[大盘] 尝试备选接口: 新浪财经实时行情...")
+                df = self._call_akshare_with_retry(ak.stock_zh_a_spot_sina, "A股实时行情(Sina)", attempts=2)
+
             if df is not None and not df.empty:
                 # 涨跌统计
                 change_col = '涨跌幅'
