@@ -29,17 +29,6 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# 修复 efinance 在 Streamlit Cloud 上的权限问题
-try:
-    import efinance
-    import os
-    # 强制设置 efinance 的数据存储路径到 /tmp，避免 Permission denied
-    os.environ["EFINANCE_DATA_PATH"] = "/tmp/efinance_data"
-    if not os.path.exists("/tmp/efinance_data"):
-        os.makedirs("/tmp/efinance_data", exist_ok=True)
-except Exception:
-    pass
-
 # 自定义 CSS
 st.markdown("""
     <style>
@@ -78,12 +67,7 @@ with st.sidebar:
         help="用于 AI 深度诊断"
     )
     
-    tushare_token = st.text_input(
-        "Tushare Token (可选)", 
-        type="password", 
-        value=os.getenv("TUSHARE_TOKEN", ""),
-        help="配置后将优先使用 Tushare 数据源"
-    )
+    # 移除 Tushare Token 输入，因为已移除该数据源
     
     # 股票列表配置
     st.subheader("📋 股票列表")
@@ -99,8 +83,10 @@ with st.sidebar:
     
     st.info("""
     **数据源说明：**
-    系统优先使用 **AkShare** 和 **Efinance**。
-    Tushare 需配置 Token 后方可激活。
+    系统已精简为最稳定的数据源：
+    1. **AkShare** (核心驱动)
+    2. **Baostock** (稳定备选)
+    3. **YFinance** (兜底方案)
     """)
 
 # 5. 核心逻辑

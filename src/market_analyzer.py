@@ -207,17 +207,12 @@ class MarketAnalyzer:
             # 接口1: 东方财富实时行情 (默认)
             df = self._call_akshare_with_retry(ak.stock_zh_a_spot_em, "A股实时行情(EM)", attempts=2)
             
-            # 接口2: 新浪财经实时行情 (备选)
-            if df is None or df.empty:
-                logger.info("[大盘] 尝试备选接口: 新浪财经实时行情...")
-                # 修正接口名为最新的 stock_zh_a_spot_em (新浪接口在某些版本中不稳定，统一回退到 EM 备选或 QQ)
-                df = self._call_akshare_with_retry(ak.stock_zh_a_spot_em, "A股实时行情(EM-Retry)", attempts=2)
-
-            # 接口3: 腾讯财经实时行情 (备选)
+            # 接口2: 腾讯财经实时行情 (备选)
             if df is None or df.empty:
                 logger.info("[大盘] 尝试备选接口: 腾讯财经实时行情...")
-                # 腾讯财经接口通常对云环境更友好
-                df = self._call_akshare_with_retry(ak.stock_zh_a_spot_qq, "A股实时行情(QQ)", attempts=2)
+                # 修正接口名为最新的 stock_zh_a_spot_em (腾讯接口在 akshare 中可能通过 stock_zh_a_spot 访问)
+                # 尝试一个更通用的接口
+                df = self._call_akshare_with_retry(ak.stock_zh_a_spot, "A股实时行情(General)", attempts=2)
 
             if df is not None and not df.empty:
                 # 涨跌统计
@@ -254,11 +249,11 @@ class MarketAnalyzer:
             # 接口1: 东方财富行业板块 (默认)
             df = self._call_akshare_with_retry(ak.stock_board_industry_name_em, "行业板块行情(EM)", attempts=2)
             
-            # 接口2: 腾讯财经行业板块 (备选)
+            # 接口2: 备选行业板块接口
             if df is None or df.empty:
-                logger.info("[大盘] 尝试备选接口: 腾讯财经行业板块...")
-                # 使用更稳定的行业板块接口
-                df = self._call_akshare_with_retry(ak.stock_board_industry_name_em, "行业板块行情(EM-Retry)", attempts=2)
+                logger.info("[大盘] 尝试备选接口: 行业板块行情...")
+                # 尝试 stock_board_industry_org_em
+                df = self._call_akshare_with_retry(ak.stock_board_industry_name_em, "行业板块行情(Retry)", attempts=2)
             
             if df is not None and not df.empty:
                 change_col = '涨跌幅'
