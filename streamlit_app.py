@@ -11,7 +11,7 @@ if project_root not in sys.path:
 
 from src.config import get_config
 from src.stock_analyzer import StockTrendAnalyzer
-from data_provider.efinance_fetcher import EFinanceFetcher
+from data_provider.efinance_fetcher import EfinanceFetcher
 from src.market_analyzer import MarketAnalyzer
 from src.analyzer import AIAnalyzer
 
@@ -34,7 +34,7 @@ if st.sidebar.button("开始分析"):
         
         # 初始化组件
         config = get_config()
-        fetcher = EFinanceFetcher()
+        fetcher = EfinanceFetcher()
         analyzer = StockTrendAnalyzer()
         ai_analyzer = AIAnalyzer()
         market_analyzer = MarketAnalyzer(analyzer=ai_analyzer)
