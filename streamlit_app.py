@@ -97,8 +97,6 @@ if analyze_btn:
     
     # 更新环境变量
     os.environ["GEMINI_API_KEY"] = gemini_key
-    if tushare_token:
-        os.environ["TUSHARE_TOKEN"] = tushare_token
     
     # 初始化后端组件
     try:
