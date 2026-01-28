@@ -210,7 +210,14 @@ class MarketAnalyzer:
             # 接口2: 新浪财经实时行情 (备选)
             if df is None or df.empty:
                 logger.info("[大盘] 尝试备选接口: 新浪财经实时行情...")
-                df = self._call_akshare_with_retry(ak.stock_zh_a_spot_sina, "A股实时行情(Sina)", attempts=2)
+                # 修正接口名为最新的 stock_zh_a_s_spot_sina
+                df = self._call_akshare_with_retry(ak.stock_zh_a_s_spot_sina, "A股实时行情(Sina)", attempts=2)
+
+            # 接口3: 腾讯财经实时行情 (备选)
+            if df is None or df.empty:
+                logger.info("[大盘] 尝试备选接口: 腾讯财经实时行情...")
+                # 腾讯财经接口通常对云环境更友好
+                df = self._call_akshare_with_retry(ak.stock_zh_a_spot_qq, "A股实时行情(QQ)", attempts=2)
 
             if df is not None and not df.empty:
                 # 涨跌统计
@@ -244,7 +251,13 @@ class MarketAnalyzer:
             logger.info("[大盘] 获取板块涨跌榜...")
             
             # 获取行业板块行情
-            df = self._call_akshare_with_retry(ak.stock_board_industry_name_em, "行业板块行情", attempts=2)
+            # 接口1: 东方财富行业板块 (默认)
+            df = self._call_akshare_with_retry(ak.stock_board_industry_name_em, "行业板块行情(EM)", attempts=2)
+            
+            # 接口2: 新浪财经行业板块 (备选)
+            if df is None or df.empty:
+                logger.info("[大盘] 尝试备选接口: 新浪财经行业板块...")
+                df = self._call_akshare_with_retry(ak.stock_sector_spot_sina, "行业板块行情(Sina)", attempts=2)
             
             if df is not None and not df.empty:
                 change_col = '涨跌幅'
