@@ -260,32 +260,15 @@ class DataFetcherManager:
         """
         初始化默认数据源列表
 
-        精简后的优先级：
-        1. AkshareFetcher (Priority 1) - 核心数据源
-        2. BaostockFetcher (Priority 2) - 稳定备选源
-        3. YfinanceFetcher (Priority 3) - 最终兜底源
+        当前配置：仅使用 Baostock (唯一数据源)
         """
-        from .akshare_fetcher import AkshareFetcher
         from .baostock_fetcher import BaostockFetcher
-        from .yfinance_fetcher import YfinanceFetcher
-        from src.config import get_config
-
-        config = get_config()
-
-        # 创建数据源实例
-        akshare = AkshareFetcher()
+        
+        # 创建 Baostock 数据源实例
         baostock = BaostockFetcher()
-        yfinance = YfinanceFetcher()
 
-        # 初始化数据源列表
-        self._fetchers = [
-            akshare,
-            baostock,
-            yfinance,
-        ]
-
-        # 按优先级排序（Tushare 如果配置了 Token 且初始化成功，优先级为 0）
-        self._fetchers.sort(key=lambda f: f.priority)
+        # 初始化数据源列表，仅包含 Baostock
+        self._fetchers = [baostock]
 
         # 构建优先级说明
         priority_info = ", ".join([f"{f.name}(P{f.priority})" for f in self._fetchers])

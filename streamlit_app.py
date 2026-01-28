@@ -45,8 +45,8 @@ st.markdown("""
         font-size: 0.8em;
         padding: 2px 8px;
         border-radius: 10px;
-        background-color: #e1f5fe;
-        color: #01579b;
+        background-color: #e8f5e9;
+        color: #2e7d32;
         margin-left: 10px;
     }
     </style>
@@ -67,8 +67,6 @@ with st.sidebar:
         help="用于 AI 深度诊断"
     )
     
-    # 移除 Tushare Token 输入，因为已移除该数据源
-    
     # 股票列表配置
     st.subheader("📋 股票列表")
     default_stocks = os.getenv("STOCK_LIST", "600519,300750,002594")
@@ -83,10 +81,8 @@ with st.sidebar:
     
     st.info("""
     **数据源说明：**
-    系统已精简为最稳定的数据源：
-    1. **AkShare** (核心驱动)
-    2. **Baostock** (稳定备选)
-    3. **YFinance** (兜底方案)
+    系统当前由 **Baostock (证券宝)** 独家驱动。
+    Baostock 提供极其稳定的 A 股历史及指数数据。
     """)
 
 # 5. 核心逻辑
@@ -101,7 +97,7 @@ if analyze_btn:
     # 初始化后端组件
     try:
         config = get_config()
-        # 使用管理器来处理多数据源
+        # 使用管理器来处理数据源 (当前仅包含 Baostock)
         fetcher_manager = DataFetcherManager()
         trend_analyzer = StockTrendAnalyzer()
         ai_analyzer = GeminiAnalyzer()
@@ -111,33 +107,26 @@ if analyze_btn:
         
         # --- 第一部分：大盘分析 ---
         st.subheader("🌍 市场大盘复盘")
-        with st.spinner("正在获取大盘实时数据及新闻..."):
+        with st.spinner("正在从 Baostock 获取大盘数据..."):
             try:
                 market_overview = market_analyzer.get_market_overview()
                 
-                # 指标展示
-                m_col1, m_col2, m_col3, m_col4 = st.columns(4)
-                m_col1.metric("上涨家数", f"{market_overview.up_count} ⬆️", delta_color="normal")
-                m_col2.metric("下跌家数", f"{market_overview.down_count} ⬇️", delta_color="inverse")
-                m_col3.metric("涨停家数", f"{market_overview.limit_up_count} 🔥")
-                m_col4.metric("两市成交额", f"{market_overview.total_amount:.2f} 亿")
+                # 指数展示
+                if market_overview.indices:
+                    cols = st.columns(len(market_overview.indices))
+                    for i, idx in enumerate(market_overview.indices):
+                        cols[i].metric(
+                            idx.name, 
+                            f"{idx.current:.2f}", 
+                            delta=f"{idx.change_pct:.2f}%"
+                        )
                 
-                # 板块信息
-                b_col1, b_col2 = st.columns(2)
-                with b_col1:
-                    st.write("**📈 领涨板块**")
-                    if market_overview.top_sectors:
-                        top_sectors_df = pd.DataFrame(market_overview.top_sectors)
-                        st.table(top_sectors_df)
-                    else:
-                        st.warning("暂无领涨板块数据")
-                with b_col2:
-                    st.write("**📉 领跌板块**")
-                    if market_overview.bottom_sectors:
-                        bottom_sectors_df = pd.DataFrame(market_overview.bottom_sectors)
-                        st.table(bottom_sectors_df)
-                    else:
-                        st.warning("暂无领跌板块数据")
+                # 统计展示
+                st.markdown("#### 📊 市场统计 (估算)")
+                m_col1, m_col2, m_col3 = st.columns(3)
+                m_col1.metric("上涨家数", f"约 {market_overview.up_count} ⬆️")
+                m_col2.metric("下跌家数", f"约 {market_overview.down_count} ⬇️")
+                m_col3.metric("全市场成交额", f"约 {market_overview.total_amount:.2f} 亿")
                         
             except Exception as e:
                 st.error(f"大盘分析执行失败: {e}")
@@ -148,8 +137,8 @@ if analyze_btn:
         
         for code in stocks:
             with st.container():
-                # 1. 获取数据 (带自动切换逻辑)
-                with st.spinner(f"正在从多源获取 {code} 数据..."):
+                # 1. 获取数据
+                with st.spinner(f"正在从 Baostock 获取 {code} 数据..."):
                     try:
                         df, source_name = fetcher_manager.get_daily_data(code, days=60)
                         
@@ -246,4 +235,4 @@ else:
         """)
 
 st.sidebar.markdown("---")
-st.sidebar.caption("Powered by Gemini AI & Streamlit")
+st.sidebar.caption("Powered by Gemini AI & Baostock")
