@@ -210,6 +210,8 @@ if analyze_btn:
                     except Exception as e:
                         st.error(f"分析 {code} 时发生异常: {e}")
                 st.markdown("---")
+    except Exception as e:
+        st.error(f"系统初始化失败: {e}")
 
 else:
     # 初始欢迎页面
