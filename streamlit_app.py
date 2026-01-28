@@ -138,7 +138,7 @@ if analyze_btn:
                 with st.spinner(f"正在深度分析 {code}..."):
                     try:
                         # 1. 获取数据
-                        df = fetcher.fetch_daily(code, days=60)
+                        df = fetcher.get_daily_data(code, days=60)
                         if df is None or df.empty:
                             st.warning(f"未能获取到 {code} 的历史数据，请检查代码是否正确。")
                             continue
