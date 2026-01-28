@@ -1,7 +1,14 @@
 import streamlit as st
 import pandas as pd
 import os
+import sys
 from datetime import datetime
+
+# 修复 Streamlit Cloud 上的导入路径问题
+project_root = os.path.dirname(os.path.abspath(__file__))
+if project_root not in sys.path:
+    sys.path.insert(0, project_root)
+
 from src.config import get_config
 from src.stock_analyzer import StockTrendAnalyzer
 from data_provider.efinance_fetcher import EFinanceFetcher
