@@ -14,7 +14,7 @@ if project_root not in sys.path:
 try:
     from src.config import get_config
     from src.stock_analyzer import StockTrendAnalyzer
-    from data_provider.efinance_fetcher import EfinanceFetcher
+    from data_provider.base import DataFetcherManager
     from src.market_analyzer import MarketAnalyzer
     from src.analyzer import GeminiAnalyzer
 except ImportError as e:
@@ -41,6 +41,14 @@ st.markdown("""
         border-radius: 10px;
         box-shadow: 0 2px 4px rgba(0,0,0,0.05);
     }
+    .source-tag {
+        font-size: 0.8em;
+        padding: 2px 8px;
+        border-radius: 10px;
+        background-color: #e1f5fe;
+        color: #01579b;
+        margin-left: 10px;
+    }
     </style>
     """, unsafe_allow_html=True)
 
@@ -51,14 +59,23 @@ with st.sidebar:
     st.header("⚙️ 配置中心")
     
     # API Key 配置
+    st.subheader("🔑 API 密钥")
     gemini_key = st.text_input(
         "Gemini API Key", 
         type="password", 
         value=os.getenv("GEMINI_API_KEY", ""),
-        help="从 Google AI Studio 获取"
+        help="用于 AI 深度诊断"
+    )
+    
+    tushare_token = st.text_input(
+        "Tushare Token (可选)", 
+        type="password", 
+        value=os.getenv("TUSHARE_TOKEN", ""),
+        help="配置后将优先使用 Tushare 数据源"
     )
     
     # 股票列表配置
+    st.subheader("📋 股票列表")
     default_stocks = os.getenv("STOCK_LIST", "600519,300750,002594")
     stock_list_input = st.text_area(
         "自选股列表 (逗号分隔)", 
@@ -70,10 +87,13 @@ with st.sidebar:
     analyze_btn = st.button("🚀 开始全量分析", use_container_width=True)
     
     st.info("""
-    **使用说明：**
-    1. 输入您的 Gemini API Key。
-    2. 输入股票代码（如 600519）。
-    3. 点击开始分析。
+    **数据源说明：**
+    系统会自动在以下源之间切换：
+    1. **Efinance** (默认首选)
+    2. **AkShare** (备选)
+    3. **Tushare** (需 Token)
+    4. **Baostock** (备选)
+    5. **YFinance** (备选)
     """)
 
 # 5. 核心逻辑
@@ -84,11 +104,14 @@ if analyze_btn:
     
     # 更新环境变量
     os.environ["GEMINI_API_KEY"] = gemini_key
+    if tushare_token:
+        os.environ["TUSHARE_TOKEN"] = tushare_token
     
     # 初始化后端组件
     try:
         config = get_config()
-        fetcher = EfinanceFetcher()
+        # 使用管理器来处理多数据源
+        fetcher_manager = DataFetcherManager()
         trend_analyzer = StockTrendAnalyzer()
         ai_analyzer = GeminiAnalyzer()
         market_analyzer = MarketAnalyzer(analyzer=ai_analyzer)
@@ -130,19 +153,20 @@ if analyze_btn:
         
         for code in stocks:
             with st.container():
-                st.write(f"### 📊 股票代码: {code}")
-                
-                # 创建三栏布局：技术面、AI诊断、决策建议
-                tab1, tab2 = st.tabs(["📈 技术面分析", "🤖 AI 深度诊断"])
-                
-                with st.spinner(f"正在深度分析 {code}..."):
+                # 1. 获取数据 (带自动切换逻辑)
+                with st.spinner(f"正在从多源获取 {code} 数据..."):
                     try:
-                        # 1. 获取数据
-                        df = fetcher.get_daily_data(code, days=60)
+                        df, source_name = fetcher_manager.get_daily_data(code, days=60)
+                        
                         if df is None or df.empty:
                             st.warning(f"未能获取到 {code} 的历史数据，请检查代码是否正确。")
                             continue
                             
+                        st.write(f"### 📊 股票代码: {code} <span class='source-tag'>来源: {source_name}</span>", unsafe_allow_html=True)
+                        
+                        # 创建标签页
+                        tab1, tab2 = st.tabs(["📈 技术面分析", "🤖 AI 深度诊断"])
+                        
                         # 2. 技术面趋势分析
                         trend_res = trend_analyzer.analyze(df, code)
                         
@@ -164,7 +188,6 @@ if analyze_btn:
                         with tab2:
                             # 3. AI 深度分析
                             try:
-                                # 构造 AI 分析所需的上下文
                                 latest = df.iloc[-1]
                                 context = {
                                     'code': code,
