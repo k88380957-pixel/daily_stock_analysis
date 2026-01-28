@@ -23,11 +23,22 @@ except ImportError as e:
 
 # 3. 页面配置
 st.set_page_config(
-    page_title="A股自选股智能分析系统",
+    page_title="中盛铭AI智能选股系统",
     page_icon="📈",
     layout="wide",
     initial_sidebar_state="expanded"
 )
+
+# 修复 efinance 在 Streamlit Cloud 上的权限问题
+try:
+    import efinance
+    import os
+    # 强制设置 efinance 的数据存储路径到 /tmp，避免 Permission denied
+    os.environ["EFINANCE_DATA_PATH"] = "/tmp/efinance_data"
+    if not os.path.exists("/tmp/efinance_data"):
+        os.makedirs("/tmp/efinance_data", exist_ok=True)
+except Exception:
+    pass
 
 # 自定义 CSS
 st.markdown("""
@@ -52,7 +63,7 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-st.title("📈 A股自选股智能分析系统")
+st.title("📈 中盛铭AI智能选股系统")
 
 # 4. 侧边栏配置
 with st.sidebar:
@@ -88,12 +99,8 @@ with st.sidebar:
     
     st.info("""
     **数据源说明：**
-    系统会自动在以下源之间切换：
-    1. **Efinance** (默认首选)
-    2. **AkShare** (备选)
-    3. **Tushare** (需 Token)
-    4. **Baostock** (备选)
-    5. **YFinance** (备选)
+    系统优先使用 **AkShare** 和 **Efinance**。
+    Tushare 需配置 Token 后方可激活。
     """)
 
 # 5. 核心逻辑
@@ -135,14 +142,18 @@ if analyze_btn:
                 b_col1, b_col2 = st.columns(2)
                 with b_col1:
                     st.write("**📈 领涨板块**")
-                    top_sectors_df = pd.DataFrame(market_overview.top_sectors)
-                    if not top_sectors_df.empty:
+                    if market_overview.top_sectors:
+                        top_sectors_df = pd.DataFrame(market_overview.top_sectors)
                         st.table(top_sectors_df)
+                    else:
+                        st.warning("暂无领涨板块数据")
                 with b_col2:
                     st.write("**📉 领跌板块**")
-                    bottom_sectors_df = pd.DataFrame(market_overview.bottom_sectors)
-                    if not bottom_sectors_df.empty:
+                    if market_overview.bottom_sectors:
+                        bottom_sectors_df = pd.DataFrame(market_overview.bottom_sectors)
                         st.table(bottom_sectors_df)
+                    else:
+                        st.warning("暂无领跌板块数据")
                         
             except Exception as e:
                 st.error(f"大盘分析执行失败: {e}")
@@ -239,7 +250,7 @@ if analyze_btn:
 else:
     # 初始欢迎页面
     st.image("https://img.icons8.com/fluency/96/stock-share.png", width=100)
-    st.info("👋 欢迎使用 A股智能分析系统！请在左侧配置 API Key 并点击开始分析。")
+    st.info("👋 欢迎使用 中盛铭AI智能选股系统！请在左侧配置 API Key 并点击开始分析。")
     
     # 展示一些预设的分析理念
     with st.expander("📖 查看本系统的交易理念"):
