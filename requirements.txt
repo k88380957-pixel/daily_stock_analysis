@@ -44,3 +44,4 @@ discord.py>=2.0.0              # Discord 机器人开发库
 
 # Web 界面
 streamlit>=1.30.0           # Streamlit 框架
+streamlit-autorefresh       # 自动刷新组件
