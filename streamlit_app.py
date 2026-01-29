@@ -31,7 +31,7 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# 自定义 CSS
+# 自定义 CSS - 保持优化的 UI 样式
 st.markdown("""
     <style>
     .main { background-color: #f0f2f6; }
@@ -71,31 +71,30 @@ with st.sidebar:
     enable_refresh = st.checkbox("开启自动刷新", value=True)
     
     st.markdown("---")
-    # 核心修改：点击按钮会触发全量分析标识
+    # 核心：点击按钮触发全量分析
     analyze_btn = st.button("🚀 开始全量分析", use_container_width=True)
     
     st.info("**数据源：** 腾讯实时 + Baostock 历史")
 
-# 5. 自动刷新逻辑
+# 5. 自动刷新逻辑 - 实现实时跳动
 if enable_refresh:
     st_autorefresh(interval=refresh_interval * 1000, key="data_refresh")
 
-# 6. Session State 管理 - 确保 AI 结果持久化
+# 6. Session State 管理 - 关键：防止自动刷新时触发 AI
 if 'analysis_results' not in st.session_state:
     st.session_state.analysis_results = {}
-if 'is_analyzing' not in st.session_state:
-    st.session_state.is_analyzing = False
-
-# 如果点击了按钮，设置分析状态
-if analyze_btn:
-    st.session_state.is_analyzing = True
+if 'has_analyzed' not in st.session_state:
+    st.session_state.has_analyzed = False
 
 # 7. 核心逻辑
-if st.session_state.is_analyzing:
+# 只要点击过分析按钮，或者已经有分析结果，就显示内容
+if analyze_btn or st.session_state.has_analyzed:
+    if analyze_btn:
+        st.session_state.has_analyzed = True
+        
     if not gemini_key:
         st.sidebar.warning("⚠️ 请先输入 Gemini API Key")
-        st.session_state.is_analyzing = False
-        st.stop()
+        if analyze_btn: st.stop()
     
     os.environ["GEMINI_API_KEY"] = gemini_key
     
@@ -106,7 +105,7 @@ if st.session_state.is_analyzing:
         tencent_fetcher = TencentFetcher()
         stocks = [s.strip() for s in stock_list_input.split(",") if s.strip()]
         
-        # --- 第一部分：大盘分析 ---
+        # --- 第一部分：大盘分析 (实时跳动) ---
         st.subheader("🌍 市场大盘复盘 (T+0 实时)")
         st.markdown(f"<div class='refresh-tag'>最后更新: {datetime.now().strftime('%H:%M:%S')}</div>", unsafe_allow_html=True)
         
@@ -124,21 +123,20 @@ if st.session_state.is_analyzing:
         st.subheader("🔍 个股深度诊断")
         
         for code in stocks:
-            # 1. 实时行情 (每次刷新都更新)
+            # 1. 实时行情 (每次刷新都更新，实现跳动)
             realtime_stock = tencent_fetcher.get_realtime_data(code)
             
-            # 2. 历史数据与 AI 诊断 (仅在点击按钮或结果不存在时执行)
-            # 核心限流保护：如果不是手动点击按钮，且已经有 AI 结果，则跳过 AI 请求
-            should_run_ai = analyze_btn or (code not in st.session_state.analysis_results)
-            
-            if should_run_ai:
-                with st.spinner(f"正在分析 {code}..."):
+            # 2. 历史数据与 AI 诊断逻辑
+            # 只有在手动点击按钮，或者该股票从未被分析过时，才执行耗时的历史数据获取和 AI 诊断
+            is_new_stock = code not in st.session_state.analysis_results
+            if analyze_btn or is_new_stock:
+                with st.spinner(f"正在深度分析 {code}..."):
                     try:
                         df, source_name = fetcher_manager.get_daily_data(code, days=60)
                         if df is not None and not df.empty:
                             trend_res = trend_analyzer.analyze(df, code)
                             
-                            # 只有在手动点击或结果为空时才请求 AI
+                            # 只有在手动点击或结果为空时才请求 AI (严格限流)
                             ai_res = None
                             try:
                                 stock_name = realtime_stock['name'] if realtime_stock else code
@@ -154,19 +152,16 @@ if st.session_state.is_analyzing:
                                 }
                                 ai_res = ai_analyzer.analyze(context)
                             except Exception as ai_e:
-                                if "429" in str(ai_e) or "limit" in str(ai_e).lower():
-                                    st.error(f"AI 接口限流中，请稍后再试或更换 API Key。")
-                                else:
-                                    st.info(f"AI 诊断暂不可用: {ai_e}")
+                                st.info(f"AI 诊断暂不可用 (可能已限流): {ai_e}")
                             
-                            # 存入 Session
+                            # 存入 Session 供后续自动刷新时直接使用
                             st.session_state.analysis_results[code] = {
                                 'df': df, 'source_name': source_name, 'trend_res': trend_res, 'ai_res': ai_res, 'stock_name': stock_name
                             }
                     except Exception as e:
                         st.error(f"获取 {code} 数据失败: {e}")
 
-            # 3. 渲染结果 (从 Session 获取)
+            # 3. 渲染结果 (从 Session 获取历史/AI，从实时接口获取价格)
             res = st.session_state.analysis_results.get(code)
             if res:
                 stock_name = realtime_stock['name'] if realtime_stock else res['stock_name']
@@ -175,9 +170,12 @@ if st.session_state.is_analyzing:
                 tab1, tab2 = st.tabs(["📈 技术面分析", "🤖 AI 深度诊断"])
                 with tab1:
                     c1, c2, c3, c4 = st.columns(4)
+                    # 价格实时跳动
                     cur_p = realtime_stock['current'] if realtime_stock else res['trend_res'].current_price
                     cur_pct = realtime_stock['pct_chg'] if realtime_stock else 0
                     c1.metric("当前价格", f"{cur_p:.2f}", delta=f"{cur_pct:.2f}%")
+                    
+                    # 历史指标保持稳定
                     c2.metric("MA5 乖离率", f"{res['trend_res'].bias_ma5:.2f}%")
                     c3.metric("趋势状态", res['trend_res'].trend_status.value)
                     c4.metric("建议信号", res['trend_res'].buy_signal.value)
@@ -197,7 +195,7 @@ if st.session_state.is_analyzing:
                             for alert in ai.get_risk_alerts(): st.write(f"- {alert}")
                         with st.expander("查看完整 AI 分析报告"): st.markdown(ai.analysis_summary)
                     else:
-                        st.info("AI 诊断报告未生成或已限流。")
+                        st.info("点击“开始全量分析”以生成 AI 诊断报告。")
                 st.markdown("---")
     except Exception as e:
         st.error(f"系统错误: {e}")
